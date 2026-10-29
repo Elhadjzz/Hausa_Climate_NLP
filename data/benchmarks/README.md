@@ -17,8 +17,9 @@ Default composition:
 - 50 terms from each of the 10 HESTC domains
 - deterministic seed: `20261029`
 - provisional Hausa candidates only
-- excludes `Needs expert coinage`
-- excludes pure `Borrowing/transliteration`
+- core benchmark uses `Existing Hausa technical term`, `Direct equivalence`, and `Descriptive translation`
+- `Hybrid translation`, `Borrowing/transliteration`, and `Needs expert coinage` are excluded from the core benchmark
+- use `--include-hybrid` only for a separate stress-test benchmark
 - approximate 70/15/15 train/dev/test split
 
 The GitHub CI workflow also generates this benchmark and publishes it as a workflow artifact.
