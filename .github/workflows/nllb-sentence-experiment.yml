@@ -16,7 +16,7 @@ on:
 
 jobs:
   sentence-experiment:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-sentence-nllb]')
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-sentence-nllb]') || contains(github.event.head_commit.message, '[run-full-200]')
     runs-on: ubuntu-latest
     timeout-minutes: 240
 
@@ -46,7 +46,7 @@ jobs:
 
       - name: Join blind sentences with terminology key
         env:
-          SAMPLE_SIZE: ${{ github.event_name == 'workflow_dispatch' && inputs.sample_size || '20' }}
+          SAMPLE_SIZE: ${{ github.event_name == 'workflow_dispatch' && inputs.sample_size || (contains(github.event.head_commit.message, '[run-full-200]') && '200' || '20') }}
         run: |
           python - <<'PY'
           import csv, os
@@ -98,6 +98,16 @@ jobs:
             --model "$MODEL_NAME" \
             --out-dir results/sentence_nllb_hestc
 
+      - name: Build machine-assisted Hausa review drafts for proxy diagnostics
+        run: |
+          python src/build_hausa_pretranslation.py             --blind build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv             --key build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv             --out build/human800/HESTC_ClimateNLP_Hausa_Machine_Pretranslation_800.csv
+
+      - name: Compute engineering-only proxy BLEU and chrF
+        run: |
+          python src/evaluate_machine_draft_proxy.py             --system-output results/sentence_nllb_hestc/baseline.csv             --machine-reference build/human800/HESTC_ClimateNLP_Hausa_Machine_Pretranslation_800.csv             --out results/sentence_nllb_hestc/baseline_machine_proxy.json
+
+          python src/evaluate_machine_draft_proxy.py             --system-output results/sentence_nllb_hestc/hestc_constrained.csv             --machine-reference build/human800/HESTC_ClimateNLP_Hausa_Machine_Pretranslation_800.csv             --out results/sentence_nllb_hestc/hestc_machine_proxy.json
+
       - name: Verify exactly one designated constraint per grounded row
         run: |
           python - <<'PY'
@@ -127,4 +137,5 @@ jobs:
             build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv
             build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv
             build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Review.csv
+            build/human800/HESTC_ClimateNLP_Hausa_Machine_Pretranslation_800.csv
             results/sentence_nllb_hestc/
