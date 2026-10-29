@@ -78,3 +78,13 @@ def test_review_priority_count():
         row["translation strategy"] == "Needs expert coinage"
         for row in load()
     ) == 1965
+
+
+def test_agroforestry_buffer_definition_present():
+    rows = load()
+    row = next(r for r in rows if r["ID"] == "HESTC-FANR-0167")
+    assert row["English term"] == "agroforestry buffer"
+    assert row["concise definition"].strip() == (
+        "Agroforestry strip designed to intercept pollutants, "
+        "reduce erosion or connect habitats."
+    )
