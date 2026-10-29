@@ -1,0 +1,8 @@
+# Climate-NLP experimental stack
+# Direct model loading is used for compatibility with current Transformers v5.
+transformers>=5.0,<6
+accelerate>=1.0
+torch>=2.2
+sentencepiece>=0.2
+sacrebleu>=2.4
+pytest>=8.0
