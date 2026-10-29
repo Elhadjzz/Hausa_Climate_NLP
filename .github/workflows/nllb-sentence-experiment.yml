@@ -1,0 +1,91 @@
+name: NLLB + HESTC sentence experiment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sample_size:
+        description: "Number of held-out test sentences to translate"
+        required: true
+        default: "200"
+      model:
+        description: "Hugging Face NLLB model"
+        required: true
+        default: "facebook/nllb-200-distilled-600M"
+
+jobs:
+  sentence-experiment:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-sentence-nllb]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install experiment dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-experiment.txt
+
+      - name: Reconstruct HESTC master corpus
+        run: python src/merge_corpus_parts.py
+
+      - name: Build 800-sentence benchmark
+        run: |
+          python src/build_human_sentence_benchmark.py             --corpus data/HESTC10K_master.csv             --out-dir build/human800
+
+      - name: Join blind sentences with terminology key
+        env:
+          SAMPLE_SIZE: ${{ github.event_name == 'workflow_dispatch' && inputs.sample_size || '20' }}
+        run: |
+          python - <<'PY'
+          import csv, os
+          base='build/human800'
+          with open(f'{base}/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv', encoding='utf-8-sig') as f:
+              blind={r['sentence_id']:r for r in csv.DictReader(f)}
+          with open(f'{base}/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv', encoding='utf-8-sig') as f:
+              key={r['sentence_id']:r for r in csv.DictReader(f)}
+          rows=[]
+          for sid,b in blind.items():
+              if b['split']!='test':
+                  continue
+              k=key[sid]
+              row=dict(b)
+              row['Hausa candidate']=k['provisional Hausa candidate']
+              row['translation strategy']=k['translation strategy']
+              row['concise definition']=k['concise definition']
+              row['hausa_reference']=''
+              rows.append(row)
+          rows=rows[:int(os.environ['SAMPLE_SIZE'])]
+          out='build/sentence_test_sample.csv'
+          with open(out,'w',encoding='utf-8-sig',newline='') as f:
+              w=csv.DictWriter(f,fieldnames=list(rows[0].keys()))
+              w.writeheader(); w.writerows(rows)
+          print('Prepared',len(rows),'held-out test sentences')
+          PY
+
+      - name: Run baseline and HESTC-constrained NLLB
+        env:
+          MODEL_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.model || 'facebook/nllb-200-distilled-600M' }}
+        run: |
+          python src/run_experiment.py             --benchmark build/sentence_test_sample.csv             --corpus data/HESTC10K_master.csv             --source-column english_sentence             --model "$MODEL_NAME"             --out-dir results/sentence_nllb_hestc
+
+      - name: Upload sentence experiment results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nllb-hestc-sentence-results
+          path: |
+            build/sentence_test_sample.csv
+            build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv
+            build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv
+            build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Review.csv
+            results/sentence_nllb_hestc/
