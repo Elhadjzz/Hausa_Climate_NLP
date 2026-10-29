@@ -26,6 +26,9 @@ def main():
         help="Optional benchmark column containing the one Hausa term to constrain",
     )
     ap.add_argument("--device", default=None)
+    ap.add_argument("--baseline-batch-size", type=int, default=1)
+    ap.add_argument("--num-beams", type=int, default=5)
+    ap.add_argument("--max-new-tokens", type=int, default=128)
     args = ap.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -51,8 +54,18 @@ def main():
     baseline = args.out_dir / "baseline.csv"
     grounded = args.out_dir / "hestc_constrained.csv"
 
-    run(common + ["--mode", "baseline", "--output", str(baseline)])
-    run(common + ["--mode", "hestc_constrained", "--output", str(grounded)])
+    run(common + [
+        "--mode", "baseline",
+        "--output", str(baseline),
+        "--batch-size", str(args.baseline_batch_size),
+        "--max-new-tokens", str(args.max_new_tokens),
+    ])
+    run(common + [
+        "--mode", "hestc_constrained",
+        "--output", str(grounded),
+        "--num-beams", str(args.num_beams),
+        "--max-new-tokens", str(args.max_new_tokens),
+    ])
 
     run([
         py,
