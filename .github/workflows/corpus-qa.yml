@@ -61,6 +61,29 @@ jobs:
           print('Verified', len(rows), 'validation rows across 10 HESTC domains')
           PY
 
+      - name: Build 800-sentence human-reference benchmark package
+        run: |
+          python src/build_human_sentence_benchmark.py \
+            --corpus data/HESTC10K_master.csv \
+            --out-dir build/human_benchmark_800
+
+      - name: Verify 800-sentence benchmark design
+        run: |
+          python - <<'PY'
+          import csv, collections
+          p='build/human_benchmark_800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv'
+          with open(p, encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==800, len(rows)
+          domains=collections.Counter(r['domain'] for r in rows)
+          splits=collections.Counter(r['split'] for r in rows)
+          assert set(domains.values())=={80}, domains
+          assert splits=={'train':480,'dev':120,'test':200}, splits
+          assert len({r['sentence_id'] for r in rows})==800
+          assert len({r['english_sentence'] for r in rows})==800
+          print('Verified 800 sentences, 80/domain, 480/120/200 split')
+          PY
+
       - name: Run regression tests
         run: pytest -q
 
@@ -72,3 +95,4 @@ jobs:
             build/qa.json
             build/hestc_climate_silver_terms.csv
             build/hestc_validation_pilot_200.csv
+            build/human_benchmark_800/
