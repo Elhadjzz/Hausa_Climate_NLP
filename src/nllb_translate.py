@@ -144,6 +144,35 @@ def translate_one(
     return tokenizer.batch_decode(output, skip_special_tokens=True)[0]
 
 
+def translate_batch(
+    texts: list[str],
+    tokenizer,
+    model,
+    device,
+    *,
+    max_new_tokens: int = 128,
+):
+    """Greedy batched translation for unconstrained baseline generation."""
+    import torch
+
+    inputs = tokenizer(
+        [norm(text) for text in texts],
+        return_tensors="pt",
+        padding=True,
+        truncation=True,
+        max_length=512,
+    ).to(device)
+
+    with torch.inference_mode():
+        output = model.generate(
+            **inputs,
+            forced_bos_token_id=tokenizer.convert_tokens_to_ids(TGT_LANG),
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+        )
+    return tokenizer.batch_decode(output, skip_special_tokens=True)
+
+
 def translate_file(args):
     rows = load_csv(args.input)
     glossary = (
@@ -154,39 +183,62 @@ def translate_file(args):
     tokenizer, model, device = load_model(args.model, args.device)
 
     output_rows = []
-    for i, row in enumerate(rows, start=1):
-        source = norm(row[args.source_column])
-        if args.mode == "hestc_constrained" and args.constraint_column:
-            candidate = norm(row.get(args.constraint_column, ""))
-            hits = [{
-                "ID": row.get("HESTC_ID", row.get("ID", "")),
-                "English term": row.get("English term", ""),
-                "Hausa candidate": candidate,
-                "translation strategy": row.get("translation strategy", ""),
-            }] if candidate else []
-        else:
-            hits = find_terms(source, glossary, args.max_constraints) if glossary else []
 
-        translation = translate_one(
-            source,
-            tokenizer,
-            model,
-            device,
-            force_terms=hits,
-            num_beams=args.num_beams,
-            max_new_tokens=args.max_new_tokens,
-        )
-        record = dict(row)
-        record["system"] = args.mode
-        record["model"] = args.model
-        record["translation"] = translation
-        record["detected_hestc_ids"] = ";".join(r["ID"] for r in hits)
-        record["forced_hausa_terms"] = ";".join(
-            norm(r["Hausa candidate"]) for r in hits
-        )
-        output_rows.append(record)
-        if i % 25 == 0:
-            print(f"Translated {i}/{len(rows)}")
+    if args.mode == "baseline" and args.batch_size > 1:
+        for start in range(0, len(rows), args.batch_size):
+            batch = rows[start : start + args.batch_size]
+            sources = [norm(row[args.source_column]) for row in batch]
+            translations = translate_batch(
+                sources,
+                tokenizer,
+                model,
+                device,
+                max_new_tokens=args.max_new_tokens,
+            )
+            for row, translation in zip(batch, translations):
+                record = dict(row)
+                record["system"] = args.mode
+                record["model"] = args.model
+                record["translation"] = translation
+                record["detected_hestc_ids"] = ""
+                record["forced_hausa_terms"] = ""
+                output_rows.append(record)
+            done = min(start + len(batch), len(rows))
+            print(f"Translated {done}/{len(rows)}")
+    else:
+        for i, row in enumerate(rows, start=1):
+            source = norm(row[args.source_column])
+            if args.mode == "hestc_constrained" and args.constraint_column:
+                candidate = norm(row.get(args.constraint_column, ""))
+                hits = [{
+                    "ID": row.get("HESTC_ID", row.get("ID", "")),
+                    "English term": row.get("English term", ""),
+                    "Hausa candidate": candidate,
+                    "translation strategy": row.get("translation strategy", ""),
+                }] if candidate else []
+            else:
+                hits = find_terms(source, glossary, args.max_constraints) if glossary else []
+
+            translation = translate_one(
+                source,
+                tokenizer,
+                model,
+                device,
+                force_terms=hits,
+                num_beams=args.num_beams,
+                max_new_tokens=args.max_new_tokens,
+            )
+            record = dict(row)
+            record["system"] = args.mode
+            record["model"] = args.model
+            record["translation"] = translation
+            record["detected_hestc_ids"] = ";".join(r["ID"] for r in hits)
+            record["forced_hausa_terms"] = ";".join(
+                norm(r["Hausa candidate"]) for r in hits
+            )
+            output_rows.append(record)
+            if i % 25 == 0:
+                print(f"Translated {i}/{len(rows)}")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = list(output_rows[0].keys()) if output_rows else []
@@ -208,6 +260,12 @@ def main():
     ap.add_argument("--device", default=None, help="e.g. cpu, cuda, cuda:0")
     ap.add_argument("--num-beams", type=int, default=5)
     ap.add_argument("--max-new-tokens", type=int, default=128)
+    ap.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Batch size for unconstrained baseline translation. Ignored for constrained decoding.",
+    )
     ap.add_argument("--max-constraints", type=int, default=3)
     ap.add_argument(
         "--constraint-column",
