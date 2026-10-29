@@ -1,6 +1,8 @@
 name: NLLB + HESTC ClimateNLP experiment
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       sample_size:
@@ -14,6 +16,7 @@ on:
 
 jobs:
   nllb-experiment:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-nllb-smoke]')
     runs-on: ubuntu-latest
     timeout-minutes: 180
 
@@ -43,7 +46,7 @@ jobs:
 
       - name: Select held-out test sample
         env:
-          SAMPLE_SIZE: ${{ inputs.sample_size }}
+          SAMPLE_SIZE: ${{ github.event_name == 'workflow_dispatch' && inputs.sample_size || '3' }}
         run: |
           python - <<'PY'
           import csv, os
@@ -63,14 +66,17 @@ jobs:
           PY
 
       - name: Run NLLB baseline and HESTC-constrained systems
+        env:
+          MODEL_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.model || 'facebook/nllb-200-distilled-600M' }}
         run: |
           python src/run_experiment.py \
             --benchmark build/silver_test_sample.csv \
             --corpus data/HESTC10K_master.csv \
-            --model "${{ inputs.model }}" \
+            --model "$MODEL_NAME" \
             --out-dir results/nllb_hestc
 
       - name: Upload experiment results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nllb-hestc-results
