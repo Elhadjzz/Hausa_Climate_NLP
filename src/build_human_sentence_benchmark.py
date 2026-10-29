@@ -4,12 +4,9 @@
 Design:
 - 80 sentences per HESTC domain = 800 total.
 - Split within every domain: 48 train, 12 dev, 20 test.
-- The blind translation file hides provisional Hausa terminology.
-- A separate terminology key supports later linguistic/domain adjudication.
+- Blind translation data hide provisional Hausa terminology.
+- A separate terminology key supports later adjudication.
 - Hausa reference sentences remain blank until independently translated.
-
-The script prefers higher-confidence terminology strategies and fills a domain
-shortfall from Hybrid translation only when needed.
 """
 from __future__ import annotations
 
@@ -42,27 +39,67 @@ CLIMATE_KEYWORDS = {
     "earth observation", "temperature", "precipitation", "rainfall", "warning",
 }
 
-DOMAIN_CONTEXT = {
-    "Climate, Meteorology & Atmospheric Science":
-        "weather forecasting, climate monitoring, and early-warning services",
-    "Water, Hydrology & Sanitation":
-        "water security, drought preparedness, flood management, and safe water services",
-    "Land, Soil, Drought & Desertification":
-        "land restoration, drought resilience, soil protection, and sustainable land management",
-    "Biodiversity, Ecology & Conservation":
-        "biodiversity conservation, ecosystem resilience, and climate-impact assessment",
-    "Forestry, Agriculture & Natural Resources":
-        "climate-smart agriculture, forest management, food security, and natural-resource planning",
-    "Pollution, Chemicals, Waste & Circular Economy":
-        "pollution prevention, chemical safety, waste management, and climate-resilient environmental services",
-    "Energy, Emissions & Environmental Technology":
-        "low-carbon development, energy transition, emissions management, and climate-resilient technology",
-    "Disaster Risk, Adaptation & Resilience":
-        "climate adaptation, disaster-risk reduction, preparedness, and community resilience",
-    "Environmental Policy, Law, Governance & Finance":
-        "climate governance, environmental policy, adaptation finance, and accountable decision-making",
-    "Environmental Monitoring, GIS, Remote Sensing & Scientific Methods":
-        "Earth observation, environmental monitoring, spatial analysis, and climate-risk assessment",
+DOMAIN_CONTEXTS = {
+    "Climate, Meteorology & Atmospheric Science": [
+        "seasonal forecasting and early-warning services",
+        "climate monitoring and weather-risk communication",
+        "forecast verification and climate-service delivery",
+        "preparedness for extreme weather and climate variability",
+    ],
+    "Water, Hydrology & Sanitation": [
+        "drought preparedness and water-security planning",
+        "flood management and freshwater-resource protection",
+        "safe water services under changing climate conditions",
+        "climate-resilient water and sanitation management",
+    ],
+    "Land, Soil, Drought & Desertification": [
+        "drought resilience and sustainable land management",
+        "soil protection and land-restoration programmes",
+        "desertification control and climate adaptation",
+        "productive landscapes under increasing climate stress",
+    ],
+    "Biodiversity, Ecology & Conservation": [
+        "species conservation and protected-area planning",
+        "ecosystem restoration and climate-impact assessment",
+        "habitat protection and biodiversity monitoring",
+        "nature-based adaptation and ecological resilience",
+    ],
+    "Forestry, Agriculture & Natural Resources": [
+        "climate-smart agriculture and food-security planning",
+        "forest management and climate adaptation",
+        "sustainable natural-resource management",
+        "agricultural resilience to changing rainfall and temperature",
+    ],
+    "Pollution, Chemicals, Waste & Circular Economy": [
+        "pollution prevention and climate-resilient environmental services",
+        "chemical safety and environmental-health protection",
+        "waste management and circular-economy planning",
+        "control of environmental contamination under climate stress",
+    ],
+    "Energy, Emissions & Environmental Technology": [
+        "low-carbon development and energy-transition planning",
+        "emissions reduction and climate-mitigation policy",
+        "renewable-energy deployment and system resilience",
+        "climate-resilient environmental technology",
+    ],
+    "Disaster Risk, Adaptation & Resilience": [
+        "climate adaptation and disaster-risk reduction",
+        "community preparedness and early warning",
+        "resilience planning for climate-related hazards",
+        "recovery and risk-informed development",
+    ],
+    "Environmental Policy, Law, Governance & Finance": [
+        "climate governance and environmental policy",
+        "adaptation finance and accountable decision-making",
+        "environmental law and climate-policy implementation",
+        "public investment for resilient and low-carbon development",
+    ],
+    "Environmental Monitoring, GIS, Remote Sensing & Scientific Methods": [
+        "Earth observation and environmental monitoring",
+        "spatial analysis for climate-risk assessment",
+        "remote sensing of environmental change",
+        "scientific evidence for climate and ecosystem decisions",
+    ],
 }
 
 TEMPLATES = [
@@ -73,15 +110,15 @@ TEMPLATES = [
     "Assessments of {term} provide evidence for {context}.",
     "Changes in {term} can affect decisions related to {context}.",
     "Field programmes track {term} to support {context}.",
-    "Researchers analyse {term} as part of {context}.",
-    "Communities benefit when information about {term} is incorporated into {context}.",
+    "Researchers analyse {term} when evaluating {context}.",
+    "Information about {term} can support {context}.",
     "Effective management of {term} can contribute to {context}.",
     "Public agencies use data on {term} to guide {context}.",
-    "The concept of {term} is relevant to {context}.",
+    "{term_cap} is relevant to decisions about {context}.",
     "Planning teams evaluate {term} when developing strategies for {context}.",
     "Evidence about {term} can improve {context}.",
     "Technical specialists document {term} to inform {context}.",
-    "Local and national institutions may consider {term} in {context}.",
+    "Institutions may consider {term} when designing programmes for {context}.",
 ]
 
 BLIND_FIELDS = [
@@ -126,9 +163,7 @@ def climate_relevance(row: dict[str, str]) -> int:
 
 def valid_term(term: str) -> bool:
     term = norm(term)
-    if not 3 <= len(term) <= 80:
-        return False
-    if len(term.split()) > 9:
+    if not 3 <= len(term) <= 80 or len(term.split()) > 9:
         return False
     if re.match(r"^\d", term):
         return False
@@ -137,6 +172,48 @@ def valid_term(term: str) -> bool:
     if term.isupper() and len(term) <= 8:
         return False
     return True
+
+
+def choose_context(row: dict[str, str], seed: int) -> str:
+    term = norm(row["English term"]).casefold()
+    contexts = DOMAIN_CONTEXTS[row["domain"]]
+    start = stable(seed + 31, row["ID"]) % len(contexts)
+    ordered = contexts[start:] + contexts[:start]
+    for context in ordered:
+        if term not in context.casefold():
+            return context
+    return ordered[0]
+
+
+def make_sentence(row: dict[str, str], seed: int) -> str:
+    term = norm(row["English term"])
+    context = choose_context(row, seed)
+
+    if term in {"Extinct", "Endangered"}:
+        return (
+            f"The category {term} is used when assessing species status in "
+            f"{context}."
+        )
+
+    term_low = term.casefold()
+    candidates = list(range(len(TEMPLATES)))
+    if term_low.startswith("monitor") and 2 in candidates:
+        candidates.remove(2)
+    if "management" in term_low and 9 in candidates:
+        candidates.remove(9)
+    if term_low.startswith("assessment") and 4 in candidates:
+        candidates.remove(4)
+    if term_low.startswith("evidence") and 13 in candidates:
+        candidates.remove(13)
+    if term_low.startswith("data") and 10 in candidates:
+        candidates.remove(10)
+
+    idx = candidates[stable(seed + 29, row["ID"]) % len(candidates)]
+    return TEMPLATES[idx].format(
+        term=term,
+        term_cap=term[0].upper() + term[1:] if term else term,
+        context=context,
+    )
 
 
 def load(path: Path):
@@ -153,6 +230,7 @@ def select(rows, per_domain: int, seed: int):
             continue
         if not valid_term(row.get("English term", "")):
             continue
+
         item = dict(row)
         item["_relevance"] = climate_relevance(row)
         item["_stable"] = stable(seed, row["ID"])
@@ -160,9 +238,8 @@ def select(rows, per_domain: int, seed: int):
         by_domain[row["domain"]].append(item)
 
     selected = []
-    for domain in sorted(DOMAIN_CONTEXT):
-        candidates = by_domain[domain]
-        core = [r for r in candidates if r["translation strategy"] in CORE]
+    for domain in sorted(DOMAIN_CONTEXTS):
+        core = [r for r in by_domain[domain] if r["translation strategy"] in CORE]
         core.sort(
             key=lambda r: (
                 -r["_relevance"],
@@ -176,7 +253,7 @@ def select(rows, per_domain: int, seed: int):
         if len(chosen) < per_domain:
             used = {r["ID"] for r in chosen}
             fill = [
-                r for r in candidates
+                r for r in by_domain[domain]
                 if r["ID"] not in used and r["translation strategy"] in FILL
             ]
             fill.sort(
@@ -186,22 +263,16 @@ def select(rows, per_domain: int, seed: int):
                     r["_stable"],
                 )
             )
-            chosen.extend(fill[: per_domain - len(chosen)])
+            chosen.extend(fill[:per_domain - len(chosen)])
 
         if len(chosen) != per_domain:
             raise RuntimeError(
                 f"{domain}: selected {len(chosen)}, expected {per_domain}"
             )
 
-        # Stable random-like ordering for split assignment.
         chosen.sort(key=lambda r: stable(seed + 17, r["ID"]))
         for i, row in enumerate(chosen):
-            if i < 48:
-                split = "train"
-            elif i < 60:
-                split = "dev"
-            else:
-                split = "test"
+            split = "train" if i < 48 else ("dev" if i < 60 else "test")
             selected.append((row, split))
 
     return selected
@@ -209,13 +280,10 @@ def select(rows, per_domain: int, seed: int):
 
 def build_records(selected, seed: int):
     blind, key, review = [], [], []
-
     for index, (row, split) in enumerate(selected, start=1):
         sid = f"HCLIM-SENT-{index:04d}"
+        sentence = make_sentence(row, seed)
         term = norm(row["English term"])
-        context = DOMAIN_CONTEXT[row["domain"]]
-        template = TEMPLATES[stable(seed + 29, row["ID"]) % len(TEMPLATES)]
-        sentence = template.format(term=term, context=context)
 
         blind.append({
             "sentence_id": sid,
@@ -292,9 +360,21 @@ def main():
     selected = select(load(args.corpus), args.per_domain, args.seed)
     blind, key, review = build_records(selected, args.seed)
 
-    write(args.out_dir / "HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv", blind, BLIND_FIELDS)
-    write(args.out_dir / "HESTC_ClimateNLP_Human_Benchmark_800_Key.csv", key, KEY_FIELDS)
-    write(args.out_dir / "HESTC_ClimateNLP_Human_Benchmark_800_Review.csv", review, REVIEW_FIELDS)
+    write(
+        args.out_dir / "HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv",
+        blind,
+        BLIND_FIELDS,
+    )
+    write(
+        args.out_dir / "HESTC_ClimateNLP_Human_Benchmark_800_Key.csv",
+        key,
+        KEY_FIELDS,
+    )
+    write(
+        args.out_dir / "HESTC_ClimateNLP_Human_Benchmark_800_Review.csv",
+        review,
+        REVIEW_FIELDS,
+    )
 
     print("Total sentences:", len(blind))
     print("Split counts:", dict(Counter(r["split"] for r in blind)))
