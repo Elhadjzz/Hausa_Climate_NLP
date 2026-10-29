@@ -44,6 +44,23 @@ jobs:
           print('Verified', len(rows), 'rows across 10 HESTC domains')
           PY
 
+      - name: Build 200-term human validation pilot
+        run: |
+          python src/build_validation_pilot.py \
+            --corpus data/HESTC10K_master.csv \
+            --out build/hestc_validation_pilot_200.csv
+
+      - name: Verify validation pilot
+        run: |
+          python - <<'PY'
+          import csv
+          with open('build/hestc_validation_pilot_200.csv', encoding='utf-8-sig') as f:
+              rows = list(csv.DictReader(f))
+          assert len(rows) == 200, len(rows)
+          assert len({r['domain'] for r in rows}) == 10
+          print('Verified', len(rows), 'validation rows across 10 HESTC domains')
+          PY
+
       - name: Run regression tests
         run: pytest -q
 
@@ -54,3 +71,4 @@ jobs:
           path: |
             build/qa.json
             build/hestc_climate_silver_terms.csv
+            build/hestc_validation_pilot_200.csv
