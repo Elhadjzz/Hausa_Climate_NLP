@@ -34,7 +34,8 @@ jobs:
 
       - name: Generate 800 unconstrained NLLB Hausa drafts
         run: |
-          python src/nllb_translate.py             --input build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv             --output build/human800/HESTC_ClimateNLP_Hausa_Draft_800.csv             --corpus data/HESTC10K_master.csv             --mode baseline             --source-column english_sentence             --model facebook/nllb-200-distilled-600M             --max-new-tokens 160
+          python src/nllb_translate.py             --input build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv             --output build/human800/HESTC_ClimateNLP_Hausa_Draft_800.csv             --corpus data/HESTC10K_master.csv             --mode baseline             --source-column english_sentence             --model facebook/nllb-200-distilled-600M             --max-new-tokens 96 \
+            --batch-size 8
 
       - name: Mark outputs as machine drafts, not gold references
         run: |
