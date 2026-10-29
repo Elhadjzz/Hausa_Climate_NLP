@@ -40,7 +40,9 @@ jobs:
 
       - name: Build 800-sentence benchmark
         run: |
-          python src/build_human_sentence_benchmark.py             --corpus data/HESTC10K_master.csv             --out-dir build/human800
+          python src/build_human_sentence_benchmark.py \
+            --corpus data/HESTC10K_master.csv \
+            --out-dir build/human800
 
       - name: Join blind sentences with terminology key
         env:
@@ -48,41 +50,78 @@ jobs:
         run: |
           python - <<'PY'
           import csv, os
-          base='build/human800'
-          with open(f'{base}/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv', encoding='utf-8-sig') as f:
-              blind={r['sentence_id']:r for r in csv.DictReader(f)}
-          with open(f'{base}/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv', encoding='utf-8-sig') as f:
-              key={r['sentence_id']:r for r in csv.DictReader(f)}
-          rows=[]
-          for sid,b in blind.items():
-              if b['split']!='test':
+
+          base = 'build/human800'
+          with open(
+              f'{base}/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv',
+              encoding='utf-8-sig'
+          ) as f:
+              blind = {r['sentence_id']: r for r in csv.DictReader(f)}
+
+          with open(
+              f'{base}/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv',
+              encoding='utf-8-sig'
+          ) as f:
+              key = {r['sentence_id']: r for r in csv.DictReader(f)}
+
+          rows = []
+          for sid, b in blind.items():
+              if b['split'] != 'test':
                   continue
-              k=key[sid]
-              row=dict(b)
-              row['Hausa candidate']=k['provisional Hausa candidate']
-              row['translation strategy']=k['translation strategy']
-              row['concise definition']=k['concise definition']
-              row['hausa_reference']=''
+              k = key[sid]
+              row = dict(b)
+              row['Hausa candidate'] = k['provisional Hausa candidate']
+              row['translation strategy'] = k['translation strategy']
+              row['concise definition'] = k['concise definition']
+              row['hausa_reference'] = ''
               rows.append(row)
-          rows=rows[:int(os.environ['SAMPLE_SIZE'])]
-          out='build/sentence_test_sample.csv'
-          with open(out,'w',encoding='utf-8-sig',newline='') as f:
-              w=csv.DictWriter(f,fieldnames=list(rows[0].keys()))
-              w.writeheader(); w.writerows(rows)
-          print('Prepared',len(rows),'held-out test sentences')
+
+          rows = rows[:int(os.environ['SAMPLE_SIZE'])]
+          out = 'build/sentence_test_sample.csv'
+          with open(out, 'w', encoding='utf-8-sig', newline='') as f:
+              w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+              w.writeheader()
+              w.writerows(rows)
+
+          print('Prepared', len(rows), 'held-out test sentences')
           PY
 
-      - name: Run baseline and HESTC-constrained NLLB
+      - name: Run baseline and single-target HESTC-constrained NLLB
         env:
           MODEL_NAME: ${{ github.event_name == 'workflow_dispatch' && inputs.model || 'facebook/nllb-200-distilled-600M' }}
         run: |
-          python src/run_experiment.py             --benchmark build/sentence_test_sample.csv             --corpus data/HESTC10K_master.csv             --source-column english_sentence             --model "$MODEL_NAME"             --out-dir results/sentence_nllb_hestc
+          python src/run_experiment.py \
+            --benchmark build/sentence_test_sample.csv \
+            --corpus data/HESTC10K_master.csv \
+            --source-column english_sentence \
+            --constraint-column "Hausa candidate" \
+            --model "$MODEL_NAME" \
+            --out-dir results/sentence_nllb_hestc
+
+      - name: Verify exactly one designated constraint per grounded row
+        run: |
+          python - <<'PY'
+          import csv
+
+          p='results/sentence_nllb_hestc/hestc_constrained.csv'
+          with open(p, encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+
+          assert rows, 'No grounded outputs'
+          for r in rows:
+              forced=[x for x in r['forced_hausa_terms'].split(';') if x]
+              assert len(forced) == 1, (r['sentence_id'], forced)
+              assert forced[0] == r['Hausa candidate'], (
+                  r['sentence_id'], forced[0], r['Hausa candidate']
+              )
+          print('Verified one designated HESTC constraint for',len(rows),'rows')
+          PY
 
       - name: Upload sentence experiment results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nllb-hestc-sentence-results
+          name: nllb-hestc-sentence-results-single-target
           path: |
             build/sentence_test_sample.csv
             build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv
