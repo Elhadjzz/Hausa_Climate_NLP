@@ -242,6 +242,25 @@ Detailed protocol: [experiments/EXPERIMENTAL_PROTOCOL.md](experiments/EXPERIMENT
 
 A manual GitHub Actions workflow is also available under **Actions → NLLB + HESTC ClimateNLP experiment**. It intentionally does not run on every push because the NLLB model is large and CPU inference is relatively expensive.
 
+## Human-validation stage
+
+The first live NLLB smoke test confirmed that HESTC lexical constraints can force provisional terminology into Hausa output, but it also showed that exact candidate inclusion is **not equivalent to natural or scientifically validated Hausa**.
+
+Smoke-test analysis: [experiments/SMOKE_TEST_RESULTS.md](experiments/SMOKE_TEST_RESULTS.md)
+
+Build the next 200-term validation pilot with:
+
+~~~bash
+python src/merge_corpus_parts.py
+python src/build_validation_pilot.py \
+  --corpus data/HESTC10K_master.csv \
+  --out data/validation/hestc_validation_pilot_200.csv
+~~~
+
+The pilot contains **20 terms per HESTC domain** and deliberately mixes easier and difficult translation strategies. It is designed for Hausa linguistic review followed by environmental domain review.
+
+Instructions: [data/validation/README.md](data/validation/README.md)
+
 ## Reproducibility boundary
 
 The repository code reconstructs the corpus assembly and QA workflow. The original corpus involved iterative source curation, human conceptual decisions, spreadsheet QA, and AI-assisted **provisional** Hausa candidate drafting. It was not produced by a single automatic scraper or one automatic translation command.
