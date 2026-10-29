@@ -24,7 +24,7 @@ Evaluate whether HESTC terminology grounding improves preservation of specialize
 
 Generate `data/benchmarks/hestc_climate_silver_terms.csv` with `src/build_climate_benchmark.py`.
 
-The default benchmark contains 50 terms from each of the ten domains, for **500 terms total**. It excludes `Needs expert coinage` and pure borrowing/transliteration entries.
+The default **core** benchmark contains 50 terms from each of the ten domains, for **500 terms total**. It uses only `Existing Hausa technical term`, `Direct equivalence`, and `Descriptive translation`. `Hybrid translation`, `Borrowing/transliteration`, and `Needs expert coinage` are excluded from the core benchmark. Hybrid candidates can be added explicitly with `--include-hybrid` for a separate stress test.
 
 The Hausa targets are **provisional HESTC candidates**. Therefore this benchmark is appropriate for engineering and baseline diagnosis, but **not** for claiming human-reference machine-translation quality.
 
@@ -58,7 +58,7 @@ The implementation loads the model directly with `AutoTokenizer` and `AutoModelF
 
 ### H1 — NLLB + HESTC constrained decoding
 
-The source sentence is matched against HESTC preferred English terms. Up to three non-overlapping detected concepts are selected. Their provisional or validated Hausa forms are tokenized and supplied to constrained beam search as required target phrases.
+The source sentence is matched against HESTC preferred English terms. Up to three non-overlapping detected concepts are selected. By default, only the more conservative HESTC strategies are eligible for lexical constraints; hybrid candidates require an explicit `--include-hybrid` option. Eligible Hausa forms are tokenized and supplied to constrained beam search as required target phrases.
 
 This is preferable to simply appending glossary translations after generation because terminology is enforced during decoding and the model optimizes the surrounding output jointly.
 
