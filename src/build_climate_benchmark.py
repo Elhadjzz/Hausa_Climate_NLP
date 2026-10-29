@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Build a deterministic silver HESTC terminology benchmark.
 
+The default "core" benchmark uses only the more conservative HESTC strategies:
+Existing Hausa technical term, Direct equivalence, and Descriptive translation.
+Hybrid candidates can be included explicitly for stress testing.
+
 The benchmark is intentionally labelled silver: Hausa targets are provisional
-HESTC candidates, not human gold-standard translations. It is useful for
-measuring baseline terminology coverage and engineering experiments, but should
-not be reported as a human-reference MT benchmark.
+HESTC candidates, not human gold-standard translations.
 """
 from __future__ import annotations
 
@@ -24,7 +26,11 @@ CLIMATE_KEYWORDS = {
     "earth observation", "temperature", "precipitation", "rainfall", "warning",
 }
 
-EXCLUDED_STRATEGIES = {"Needs expert coinage", "Borrowing/transliteration"}
+DEFAULT_ALLOWED_STRATEGIES = {
+    "Existing Hausa technical term",
+    "Direct equivalence",
+    "Descriptive translation",
+}
 
 FIELDS = [
     "benchmark_id", "HESTC_ID", "English term", "Hausa candidate", "domain",
@@ -64,12 +70,21 @@ def load_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
-def build(rows: list[dict[str, str]], per_domain: int, seed: int):
+def build(
+    rows: list[dict[str, str]],
+    per_domain: int,
+    seed: int,
+    include_hybrid: bool = False,
+):
+    allowed = set(DEFAULT_ALLOWED_STRATEGIES)
+    if include_hybrid:
+        allowed.add("Hybrid translation")
+
     eligible = []
     for row in rows:
         if row.get("validation status") != "Candidate drafted":
             continue
-        if row.get("translation strategy") in EXCLUDED_STRATEGIES:
+        if row.get("translation strategy") not in allowed:
             continue
         if not normalize(row.get("Hausa candidate", "")):
             continue
@@ -127,9 +142,19 @@ def main() -> None:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--per-domain", type=int, default=50)
     ap.add_argument("--seed", type=int, default=20261029)
+    ap.add_argument(
+        "--include-hybrid",
+        action="store_true",
+        help="Include provisional Hybrid translation candidates for stress testing",
+    )
     args = ap.parse_args()
 
-    rows = build(load_csv(args.corpus), args.per_domain, args.seed)
+    rows = build(
+        load_csv(args.corpus),
+        args.per_domain,
+        args.seed,
+        include_hybrid=args.include_hybrid,
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
@@ -138,6 +163,7 @@ def main() -> None:
 
     print(f"Wrote {len(rows)} silver benchmark rows to {args.out}")
     print("Split counts:", dict(Counter(r["split"] for r in rows)))
+    print("Strategy counts:", dict(Counter(r["translation strategy"] for r in rows)))
     print("Domain counts:", dict(Counter(r["domain"] for r in rows)))
 
 
