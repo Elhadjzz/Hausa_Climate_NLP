@@ -242,6 +242,31 @@ Detailed protocol: [experiments/EXPERIMENTAL_PROTOCOL.md](experiments/EXPERIMENT
 
 A manual GitHub Actions workflow is also available under **Actions → NLLB + HESTC ClimateNLP experiment**. It intentionally does not run on every push because the NLLB model is large and CPU inference is relatively expensive.
 
+## 800-sentence human-reference benchmark
+
+A balanced benchmark constructor is now included for the publication experiment.
+
+~~~bash
+python src/merge_corpus_parts.py
+
+python src/build_human_sentence_benchmark.py \
+  --corpus data/HESTC10K_master.csv \
+  --out-dir build/human_benchmark_800
+~~~
+
+The default design contains:
+
+- **800 English climate/environment sentences**
+- **80 sentences per HESTC domain**
+- **480 train / 120 dev / 200 held-out test**
+- one explicit HESTC target concept per sentence
+- complete source-institution and source-URL traceability
+- a **blind translation file** that hides provisional Hausa terminology
+- a separate **terminology key**
+- a separate **adjudication/review file**
+
+This separation is intentional: independent Hausa translators should complete the blind reference before reviewers consult the provisional HESTC candidate. The resulting Hausa sentence should only be treated as a gold reference after linguistic and environmental-domain review.
+
 ## Human-validation stage
 
 The first live NLLB smoke test confirmed that HESTC lexical constraints can force provisional terminology into Hausa output, but it also showed that exact candidate inclusion is **not equivalent to natural or scientifically validated Hausa**.
