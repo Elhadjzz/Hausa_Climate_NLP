@@ -27,5 +27,30 @@ jobs:
       - name: Run independent corpus QA
         run: python src/qa_corpus.py data/HESTC10K_master.csv --json-out build/qa.json
 
+      - name: Build deterministic 500-term ClimateNLP silver benchmark
+        run: |
+          python src/build_climate_benchmark.py \
+            --corpus data/HESTC10K_master.csv \
+            --out build/hestc_climate_silver_terms.csv
+
+      - name: Verify silver benchmark size
+        run: |
+          python - <<'PY'
+          import csv
+          with open('build/hestc_climate_silver_terms.csv', encoding='utf-8-sig') as f:
+              rows = list(csv.DictReader(f))
+          assert len(rows) == 500, len(rows)
+          assert len({r['domain'] for r in rows}) == 10
+          print('Verified', len(rows), 'rows across 10 HESTC domains')
+          PY
+
       - name: Run regression tests
         run: pytest -q
+
+      - name: Upload QA and silver benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hestc-corpus-qa-and-silver-benchmark
+          path: |
+            build/qa.json
+            build/hestc_climate_silver_terms.csv
