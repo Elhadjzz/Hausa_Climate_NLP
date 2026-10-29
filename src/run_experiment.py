@@ -20,6 +20,11 @@ def main():
     ap.add_argument("--out-dir", type=Path, default=Path("results/nllb_hestc"))
     ap.add_argument("--model", default="facebook/nllb-200-distilled-600M")
     ap.add_argument("--source-column", default="English term")
+    ap.add_argument(
+        "--constraint-column",
+        default=None,
+        help="Optional benchmark column containing the one Hausa term to constrain",
+    )
     ap.add_argument("--device", default=None)
     args = ap.parse_args()
 
@@ -38,6 +43,8 @@ def main():
         "--source-column",
         args.source_column,
     ]
+    if args.constraint_column:
+        common += ["--constraint-column", args.constraint_column]
     if args.device:
         common += ["--device", args.device]
 
