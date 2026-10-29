@@ -156,7 +156,17 @@ def translate_file(args):
     output_rows = []
     for i, row in enumerate(rows, start=1):
         source = norm(row[args.source_column])
-        hits = find_terms(source, glossary, args.max_constraints) if glossary else []
+        if args.mode == "hestc_constrained" and args.constraint_column:
+            candidate = norm(row.get(args.constraint_column, ""))
+            hits = [{
+                "ID": row.get("HESTC_ID", row.get("ID", "")),
+                "English term": row.get("English term", ""),
+                "Hausa candidate": candidate,
+                "translation strategy": row.get("translation strategy", ""),
+            }] if candidate else []
+        else:
+            hits = find_terms(source, glossary, args.max_constraints) if glossary else []
+
         translation = translate_one(
             source,
             tokenizer,
@@ -199,6 +209,11 @@ def main():
     ap.add_argument("--num-beams", type=int, default=5)
     ap.add_argument("--max-new-tokens", type=int, default=128)
     ap.add_argument("--max-constraints", type=int, default=3)
+    ap.add_argument(
+        "--constraint-column",
+        default=None,
+        help="For benchmark rows, force only the Hausa term in this column instead of detecting all glossary terms",
+    )
     ap.add_argument(
         "--include-hybrid",
         action="store_true",
