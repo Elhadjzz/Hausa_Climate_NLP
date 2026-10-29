@@ -1,0 +1,2 @@
+# Core corpus build and QA scripts use only Python's standard library.
+pytest>=8.0
