@@ -6,13 +6,13 @@
 
 - **11,034** unique preferred English environmental concepts
 - **10** environmental and climate-related domains
+- **24** canonical part-level CSV files
 - **14 fields** per terminology record
 - **243** curated institutional source-resource records
-- **236** distinct source URLs
 - Complete row-level source traceability
 - Hausa candidate terminology for all 11,034 concepts
 - All Hausa forms currently remain **Candidate drafted**
-- Specialist entries requiring linguistic/domain coinage are isolated in the review-priority data
+- **1,965** concepts are marked `Needs expert coinage`
 
 > **Important:** HESTC-10K is not yet an officially standardized Hausa environmental dictionary. Hausa forms are provisional terminology candidates until they pass Hausa linguistic review, domain-expert review, cross-domain harmonization, and final validation.
 
@@ -38,13 +38,13 @@
 Hausa_Climate_NLP/
 ├── README.md
 ├── requirements.txt
-├── .gitignore
 ├── LICENSE_NOTE.md
 ├── data/
-│   ├── HESTC10K_master.csv.gz
+│   ├── corpus_parts/
+│   │   ├── Part1A_Terms.csv ... Part10B_Terms.csv
+│   │   ├── MANIFEST.csv
+│   │   └── README.md
 │   ├── HESTC10K_source_catalogue.csv
-│   ├── HESTC10K_review_priority.csv.gz
-│   ├── HESTC_10K_Full_Hausa_Candidate_Corpus.xlsx
 │   ├── QA_report.json
 │   └── README.md
 ├── docs/
@@ -54,6 +54,7 @@ Hausa_Climate_NLP/
 │   └── REPRODUCIBILITY.md
 ├── src/
 │   ├── build_hestc10k.py
+│   ├── merge_corpus_parts.py
 │   ├── qa_corpus.py
 │   ├── hausa_candidate_engine.py
 │   └── hestc_schema.py
@@ -65,49 +66,132 @@ Hausa_Climate_NLP/
 
 ## Corpus schema
 
-Each record contains 14 fields: ID, English term, synonym/abbreviation, terminology type, domain, subdomain, concise definition, source institution, source identifier/link, Hausa candidate, translation strategy, preferred Hausa, validation status, and reviewer notes.
+Every record has 14 fields:
 
-## Reproducible QA
+1. ID
+2. English term
+3. synonym/abbreviation
+4. terminology type
+5. domain
+6. subdomain
+7. concise definition
+8. source institution
+9. source identifier/link
+10. Hausa candidate
+11. translation strategy
+12. preferred Hausa
+13. validation status
+14. reviewer notes
 
-The canonical master CSV is stored compressed to keep the repository compact. First unpack it:
+## Reconstruct the complete master corpus
+
+The GitHub distribution stores the canonical corpus as 24 part-level CSV files. Reconstruct the full corpus with:
 
 ```bash
-python - <<'PY'
-import gzip, shutil
-with gzip.open("data/HESTC10K_master.csv.gz", "rb") as src, open("data/HESTC10K_master.csv", "wb") as dst:
-    shutil.copyfileobj(src, dst)
-PY
+python src/merge_corpus_parts.py
+```
+
+The command creates:
+
+- `data/HESTC10K_master.csv`
+- `data/HESTC10K_review_priority.csv`
+- `data/HESTC10K_merge_QA.json`
+
+The merge process checks the expected count of every part and verifies the complete **11,034-record** corpus.
+
+## Run corpus QA
+
+After merging:
+
+```bash
 python src/qa_corpus.py data/HESTC10K_master.csv
 ```
 
-Expected core checks: 11,034 records, zero duplicate preferred English labels, zero missing definitions, zero missing source URLs, zero missing Hausa candidates, and current validation status `Candidate drafted`.
+Expected core checks:
 
-## Example climate-NLP terminology grounding
+- total records: 11,034
+- duplicate IDs: 0
+- duplicate preferred English labels: 0
+- missing concise definitions: 0
+- missing source URLs: 0
+- missing Hausa candidates: 0
+- validation status: `Candidate drafted` for the current release
+
+## Run tests
 
 ```bash
-python examples/climate_terminology_grounding.py   --corpus data/HESTC10K_master.csv   --text "Climate adaptation and early warning systems reduce disaster risk."
+pip install -r requirements.txt
+pytest -q
 ```
 
-The script detects HESTC concepts and returns available Hausa candidate terminology and definitions. It can serve as a terminology layer before machine translation, retrieval, question answering or LLM generation.
+## Example: climate-NLP terminology grounding
 
-## Method
+The example can use either the generated master CSV or an individual part.
 
-HESTC-10K used an **institution-first terminology-engineering workflow**: define the schema and domains; identify authoritative institutional resources; curate reusable scientific and policy concepts; prepare concise definitions; classify terms; preserve source traceability; deduplicate preferred English labels corpus-wide; assign stable HESTC IDs; draft Hausa candidates using controlled translation strategies; flag terms needing expert coinage; and run corpus-wide QA.
+```bash
+python src/merge_corpus_parts.py
 
-See [docs/CORPUS_METHODOLOGY.md](docs/CORPUS_METHODOLOGY.md).
+python examples/climate_terminology_grounding.py \
+  --corpus data/HESTC10K_master.csv \
+  --text "Climate adaptation and early warning systems reduce disaster risk."
+```
 
-## Sources
+The script detects HESTC concepts and returns available Hausa candidate terminology, definitions, domain metadata, source links and validation status.
 
-Major source families include WMO, IPCC, UNFCCC, FAO, WHO, UNESCO, UNEP, UNCCD, CBD, IUCN, CITES, UNDRR, IEA, IRENA, World Bank, Green Climate Fund, NASA, USGS, NIST and OGC.
+## Method used to develop HESTC
+
+HESTC-10K follows an **institution-first terminology-engineering workflow**:
+
+1. define the environmental scope, domains and controlled schema;
+2. identify authoritative institutional resources;
+3. curate reusable scientific, technical, policy and governance concepts;
+4. prepare concise normalized definitions;
+5. classify each concept by domain, subdomain and terminology type;
+6. preserve institutional provenance and source URL;
+7. normalize and deduplicate preferred English labels corpus-wide;
+8. assign stable HESTC identifiers;
+9. draft provisional Hausa terminology using controlled translation strategies;
+10. flag scientifically difficult concepts for expert coinage;
+11. perform corpus-wide QA; and
+12. keep candidate drafting distinct from human validation.
+
+Full methodology: [docs/CORPUS_METHODOLOGY.md](docs/CORPUS_METHODOLOGY.md)
+
+## Authoritative source families
+
+HESTC uses resources from organizations including WMO, IPCC, UNFCCC, FAO, WHO, UNESCO, UNEP, UNCCD, CBD, IUCN, CITES, UNDRR, IEA, IRENA, World Bank, Green Climate Fund, NASA, USGS, NIST and OGC.
+
+The complete registry is [data/HESTC10K_source_catalogue.csv](data/HESTC10K_source_catalogue.csv).
+
+## Hausa candidate strategies
+
+| Translation strategy | Concepts |
+|---|---:|
+| Existing Hausa technical term | 197 |
+| Direct equivalence | 1,294 |
+| Descriptive translation | 832 |
+| Hybrid translation | 6,291 |
+| Borrowing/transliteration | 455 |
+| Needs expert coinage | 1,965 |
+| **Total** | **11,034** |
 
 ## Climate-NLP research uses
 
-HESTC can support terminology-aware English–Hausa machine translation, climate concept recognition, bilingual climate-information retrieval, RAG and question answering, climate-policy classification, agricultural and early-warning communication, terminology consistency checking, and climate chatbot/mobile applications.
+HESTC can support:
 
-## Reproducibility note
+- terminology-aware English–Hausa machine translation;
+- climate concept recognition;
+- bilingual climate-information retrieval;
+- retrieval-augmented generation and question answering;
+- climate-policy classification;
+- agricultural and early-warning communication;
+- terminology consistency checking;
+- climate chatbots and mobile advisory systems.
 
-The code reconstructs the corpus-building and QA workflow used during HESTC development. The original project involved iterative institutional source curation, manual conceptual decisions, spreadsheet QA, and AI-assisted candidate drafting. It was **not** generated by a single web scraper or one automatic translation script.
+## Reproducibility boundary
+
+The repository code reconstructs the corpus assembly and QA workflow. The original corpus involved iterative source curation, human conceptual decisions, spreadsheet QA, and AI-assisted **provisional** Hausa candidate drafting. It was not produced by a single automatic scraper or one automatic translation command.
 
 ## License
 
-A publication license has not yet been selected. See `LICENSE_NOTE.md` before redistributing the dataset.
+A publication license has not yet been selected. Review [LICENSE_NOTE.md](LICENSE_NOTE.md) before redistributing the dataset.
