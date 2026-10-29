@@ -84,6 +84,26 @@ jobs:
           print('Verified 800 sentences, 80/domain, 480/120/200 split')
           PY
 
+      - name: Build 800 Hausa machine pretranslations for reviewer assistance
+        run: |
+          python src/build_hausa_pretranslation.py \
+            --blind build/human_benchmark_800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv \
+            --key build/human_benchmark_800/HESTC_ClimateNLP_Human_Benchmark_800_Key.csv \
+            --out build/human_benchmark_800/HESTC_ClimateNLP_Hausa_Machine_Pretranslation_800.csv
+
+      - name: Verify machine pretranslation layer
+        run: |
+          python - <<'PY'
+          import csv
+          p='build/human_benchmark_800/HESTC_ClimateNLP_Hausa_Machine_Pretranslation_800.csv'
+          with open(p, encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==800, len(rows)
+          assert all(r['machine_hausa_pretranslation'].strip() for r in rows)
+          assert all('NOT a gold reference' in r['draft_status'] for r in rows)
+          print('Verified 800 reviewer-aid Hausa machine pretranslations')
+          PY
+
       - name: Run regression tests
         run: pytest -q
 
