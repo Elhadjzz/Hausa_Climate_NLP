@@ -8,3 +8,6 @@ dist/
 .DS_Store
 data/HESTC10K_master.csv
 data/HESTC10K_review_priority.csv
+results/
+data/benchmarks/hestc_climate_silver_terms.csv
+.cache/
