@@ -2,8 +2,11 @@
 """English -> Hausa NLLB baseline and HESTC-constrained translation.
 
 Uses direct model loading for current Transformers compatibility. HESTC
-grounding uses lexical constraints during beam search. Constraints derived from
-candidate HESTC terminology remain provisional until human validation.
+grounding uses lexical constraints during beam search. By default, only the
+more conservative terminology strategies are eligible as constraints.
+
+Constraints derived from candidate HESTC terminology remain provisional until
+human validation.
 """
 from __future__ import annotations
 
@@ -13,6 +16,11 @@ import re
 from pathlib import Path
 
 MODEL_DEFAULT = "facebook/nllb-200-distilled-600M"
+DEFAULT_CONSTRAINT_STRATEGIES = {
+    "Existing Hausa technical term",
+    "Direct equivalence",
+    "Descriptive translation",
+}
 SRC_LANG = "eng_Latn"
 TGT_LANG = "hau_Latn"
 
@@ -26,13 +34,17 @@ def load_csv(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
-def load_glossary(path: Path) -> list[dict[str, str]]:
+def load_glossary(path: Path, include_hybrid: bool = False) -> list[dict[str, str]]:
     rows = load_csv(path)
+    allowed = set(DEFAULT_CONSTRAINT_STRATEGIES)
+    if include_hybrid:
+        allowed.add("Hybrid translation")
+
     usable = []
     for row in rows:
         eng = norm(row.get("English term", ""))
         hau = norm(row.get("Hausa candidate", ""))
-        if eng and hau and row.get("translation strategy") != "Needs expert coinage":
+        if eng and hau and row.get("translation strategy") in allowed:
             usable.append(row)
     return sorted(usable, key=lambda r: len(r["English term"]), reverse=True)
 
@@ -97,7 +109,7 @@ def translate_one(
     *,
     force_terms=None,
     num_beams: int = 5,
-    max_new_tokens: int = 256,
+    max_new_tokens: int = 128,
 ):
     import torch
 
@@ -123,6 +135,8 @@ def translate_one(
                 early_stopping=True,
                 custom_generate="transformers-community/constrained-beam-search",
                 trust_remote_code=True,
+                no_repeat_ngram_size=3,
+                repetition_penalty=1.1,
             )
 
     with torch.inference_mode():
@@ -132,7 +146,11 @@ def translate_one(
 
 def translate_file(args):
     rows = load_csv(args.input)
-    glossary = load_glossary(args.corpus) if args.mode == "hestc_constrained" else []
+    glossary = (
+        load_glossary(args.corpus, include_hybrid=args.include_hybrid)
+        if args.mode == "hestc_constrained"
+        else []
+    )
     tokenizer, model, device = load_model(args.model, args.device)
 
     output_rows = []
@@ -153,7 +171,9 @@ def translate_file(args):
         record["model"] = args.model
         record["translation"] = translation
         record["detected_hestc_ids"] = ";".join(r["ID"] for r in hits)
-        record["forced_hausa_terms"] = ";".join(norm(r["Hausa candidate"]) for r in hits)
+        record["forced_hausa_terms"] = ";".join(
+            norm(r["Hausa candidate"]) for r in hits
+        )
         output_rows.append(record)
         if i % 25 == 0:
             print(f"Translated {i}/{len(rows)}")
@@ -177,8 +197,13 @@ def main():
     ap.add_argument("--model", default=MODEL_DEFAULT)
     ap.add_argument("--device", default=None, help="e.g. cpu, cuda, cuda:0")
     ap.add_argument("--num-beams", type=int, default=5)
-    ap.add_argument("--max-new-tokens", type=int, default=256)
+    ap.add_argument("--max-new-tokens", type=int, default=128)
     ap.add_argument("--max-constraints", type=int, default=3)
+    ap.add_argument(
+        "--include-hybrid",
+        action="store_true",
+        help="Allow provisional Hybrid translation candidates as lexical constraints",
+    )
     args = ap.parse_args()
     translate_file(args)
 
