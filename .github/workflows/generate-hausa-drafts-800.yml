@@ -1,0 +1,62 @@
+name: Generate 800 Hausa draft references
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  draft-800:
+    if: contains(github.event.head_commit.message, '[run-full-drafts]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install NLLB experiment dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-experiment.txt
+
+      - name: Reconstruct HESTC master corpus
+        run: python src/merge_corpus_parts.py
+
+      - name: Build 800-sentence blind benchmark
+        run: |
+          python src/build_human_sentence_benchmark.py             --corpus data/HESTC10K_master.csv             --out-dir build/human800
+
+      - name: Generate 800 unconstrained NLLB Hausa drafts
+        run: |
+          python src/nllb_translate.py             --input build/human800/HESTC_ClimateNLP_Human_Benchmark_800_Blind.csv             --output build/human800/HESTC_ClimateNLP_Hausa_Draft_800.csv             --corpus data/HESTC10K_master.csv             --mode baseline             --source-column english_sentence             --model facebook/nllb-200-distilled-600M             --max-new-tokens 160
+
+      - name: Mark outputs as machine drafts, not gold references
+        run: |
+          python - <<'PY'
+          import csv
+          p='build/human800/HESTC_ClimateNLP_Hausa_Draft_800.csv'
+          with open(p, encoding='utf-8-sig', newline='') as f:
+              rows=list(csv.DictReader(f))
+          for r in rows:
+              r['reference_status']='Machine-assisted Hausa draft; requires human linguistic and domain review'
+              r['hausa_reference_draft']=r.pop('translation')
+          fields=list(rows[0])
+          with open(p,'w',encoding='utf-8-sig',newline='') as f:
+              w=csv.DictWriter(f,fieldnames=fields)
+              w.writeheader()
+              w.writerows(rows)
+          print('Prepared',len(rows),'machine-assisted Hausa drafts')
+          PY
+
+      - name: Upload draft benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hestc-hausa-draft-800
+          path: |
+            build/human800/
