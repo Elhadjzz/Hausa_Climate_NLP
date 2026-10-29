@@ -188,6 +188,60 @@ HESTC can support:
 - terminology consistency checking;
 - climate chatbots and mobile advisory systems.
 
+## Phase 2 — HESTC-ClimateNLP experiment
+
+The repository now includes an experimental English→Hausa machine-translation framework comparing:
+
+- **B1:** unconstrained NLLB baseline;
+- **H1:** NLLB with HESTC lexical constraints during beam-search decoding.
+
+The default model is `facebook/nllb-200-distilled-600M`, with `eng_Latn` as the source language and `hau_Latn` as the Hausa target language.
+
+### Build the 500-term silver benchmark
+
+~~~bash
+python src/merge_corpus_parts.py
+
+python src/build_climate_benchmark.py \
+  --corpus data/HESTC10K_master.csv \
+  --out data/benchmarks/hestc_climate_silver_terms.csv
+~~~
+
+The builder selects **50 climate/environment-relevant terms from each HESTC domain**, for 500 terms total. It excludes `Needs expert coinage` and pure borrowing/transliteration entries.
+
+This is a **silver benchmark**: its Hausa targets are provisional HESTC candidates, not independently validated gold references.
+
+### Install NLLB experiment dependencies
+
+~~~bash
+pip install -r requirements-experiment.txt
+~~~
+
+### Run baseline versus HESTC-constrained NLLB
+
+~~~bash
+python src/run_experiment.py \
+  --benchmark data/benchmarks/hestc_climate_silver_terms.csv \
+  --corpus data/HESTC10K_master.csv \
+  --out-dir results/silver_nllb
+~~~
+
+The evaluator reports:
+
+- terminology exact-match accuracy;
+- lexical-constraint success rate;
+- results by HESTC domain;
+- results by translation strategy;
+- BLEU and chrF when independent Hausa sentence references are supplied.
+
+### Publication-grade benchmark
+
+Use `data/benchmarks/human_sentence_benchmark_template.csv` to create a manually translated and independently reviewed climate sentence benchmark. The paper should report BLEU/chrF only from this human-reference layer.
+
+Detailed protocol: [experiments/EXPERIMENTAL_PROTOCOL.md](experiments/EXPERIMENTAL_PROTOCOL.md)
+
+A manual GitHub Actions workflow is also available under **Actions → NLLB + HESTC ClimateNLP experiment**. It intentionally does not run on every push because the NLLB model is large and CPU inference is relatively expensive.
+
 ## Reproducibility boundary
 
 The repository code reconstructs the corpus assembly and QA workflow. The original corpus involved iterative source curation, human conceptual decisions, spreadsheet QA, and AI-assisted **provisional** Hausa candidate drafting. It was not produced by a single automatic scraper or one automatic translation command.
