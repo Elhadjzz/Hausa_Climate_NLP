@@ -1,21 +1,39 @@
 import csv
-import gzip
 import re
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
-CORPUS_GZ = ROOT / "data" / "HESTC10K_master.csv.gz"
-CORPUS_CSV = ROOT / "data" / "HESTC10K_master.csv"
+MASTER = ROOT / "data" / "HESTC10K_master.csv"
+PART_DIR = ROOT / "data" / "corpus_parts"
+
+PART_FILES = [
+    "Part1A_Terms.csv", "Part1B_Terms.csv", "Part1C_Terms.csv",
+    "Part2A_Terms.csv", "Part2B_Terms.csv", "Part2C_Terms.csv",
+    "Part3A_Terms.csv", "Part3B_Terms.csv", "Part3C_Terms.csv",
+    "Part4A_Terms.csv", "Part4B_Terms.csv", "Part4C_Terms.csv",
+    "Part5A_Terms.csv", "Part5B_Terms.csv",
+    "Part6A_Terms.csv", "Part6B_Terms.csv",
+    "Part7A_Terms.csv", "Part7B_Terms.csv",
+    "Part8A_Terms.csv", "Part8B_Terms.csv",
+    "Part9A_Terms.csv", "Part9B_Terms.csv",
+    "Part10A_Terms.csv", "Part10B_Terms.csv",
+]
+
+
+def read_csv(path):
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
 
 
 def load():
-    if CORPUS_CSV.exists():
-        handle = CORPUS_CSV.open("r", encoding="utf-8-sig", newline="")
-    else:
-        handle = gzip.open(CORPUS_GZ, "rt", encoding="utf-8-sig", newline="")
-    with handle:
-        return list(csv.DictReader(handle))
+    if MASTER.exists():
+        return read_csv(MASTER)
+
+    rows = []
+    for filename in PART_FILES:
+        rows.extend(read_csv(PART_DIR / filename))
+    return rows
 
 
 def normalize(value):
@@ -24,6 +42,11 @@ def normalize(value):
 
 def test_record_count():
     assert len(load()) == 11034
+
+
+def test_no_duplicate_ids():
+    ids = [row["ID"].strip() for row in load()]
+    assert not [key for key, count in Counter(ids).items() if count > 1]
 
 
 def test_no_duplicate_preferred_english_labels():
@@ -48,3 +71,10 @@ def test_hausa_candidates_complete():
 
 def test_current_status_is_candidate_drafted():
     assert set(row["validation status"] for row in load()) == {"Candidate drafted"}
+
+
+def test_review_priority_count():
+    assert sum(
+        row["translation strategy"] == "Needs expert coinage"
+        for row in load()
+    ) == 1965
