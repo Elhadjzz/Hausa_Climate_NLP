@@ -121,6 +121,8 @@ def translate_one(
                 force_words_ids=force_words_ids,
                 num_beams=max(2, num_beams),
                 early_stopping=True,
+                custom_generate="transformers-community/constrained-beam-search",
+                trust_remote_code=True,
             )
 
     with torch.inference_mode():
