@@ -1,0 +1,18 @@
+{
+  "records": 11034,
+  "duplicate_preferred_english_labels": 0,
+  "missing_definitions": 0,
+  "missing_source_links": 0,
+  "missing_hausa_candidates": 0,
+  "validation_status_counts": {
+    "Candidate drafted": 11034
+  },
+  "translation_strategy_counts": {
+    "Existing Hausa technical term": 197,
+    "Direct equivalence": 1294,
+    "Descriptive translation": 832,
+    "Hybrid translation": 6291,
+    "Borrowing/transliteration": 455,
+    "Needs expert coinage": 1965
+  }
+}
