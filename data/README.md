@@ -1,19 +1,43 @@
-# HESTC data files
+# HESTC-10K data
 
-- `HESTC10K_master.csv.gz` — compressed canonical 11,034-record corpus.
-- `HESTC10K_source_catalogue.csv` — full institutional source registry.
-- `HESTC10K_review_priority.csv.gz` — compressed expert-review queue.
-- `HESTC_10K_Full_Hausa_Candidate_Corpus.xlsx` — formatted research workbook.
-- `QA_report.json` — corpus QA summary.
+## Canonical GitHub distribution
 
-To unpack the master corpus:
+The complete 11,034-record corpus is stored in:
+
+`data/corpus_parts/`
+
+There are 24 part-level CSV files corresponding to HESTC Parts 1A–10B. Each uses the same 14-column schema.
+
+`data/corpus_parts/MANIFEST.csv` records the exact expected count for every file.
+
+## Build the master corpus
+
+Run from the repository root:
 
 ```bash
-python - <<'PY'
-import gzip, shutil
-with gzip.open("data/HESTC10K_master.csv.gz", "rb") as src, open("data/HESTC10K_master.csv", "wb") as dst:
-    shutil.copyfileobj(src, dst)
-PY
+python src/merge_corpus_parts.py
 ```
 
-All Hausa entries in this release are provisional candidates and should not be described as officially validated terminology.
+This generates:
+
+- `data/HESTC10K_master.csv` — complete 11,034-record corpus
+- `data/HESTC10K_review_priority.csv` — all records with `Needs expert coinage`
+- `data/HESTC10K_merge_QA.json` — merge and integrity report
+
+These generated files are ignored by Git because the canonical source data are the part CSVs.
+
+## Source catalogue
+
+`HESTC10K_source_catalogue.csv` contains the complete registry of **243 institutional resources** used during corpus curation.
+
+## QA report
+
+`QA_report.json` records verified release-level statistics.
+
+## Validation warning
+
+Every Hausa entry in the current release remains **Candidate drafted**. Do not describe the corpus as an officially standardized Hausa environmental dictionary until the validation protocol in `docs/VALIDATION_PROTOCOL.md` has been completed.
+
+## Formatted workbook
+
+The research workflow also maintains a formatted Excel workbook with dashboards and review sheets. The canonical GitHub data distribution is CSV-based because it is diffable, reproducible and easier to audit programmatically.
