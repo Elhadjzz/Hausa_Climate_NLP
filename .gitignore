@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.DS_Store
+data/HESTC10K_master.csv
+data/HESTC10K_review_priority.csv
