@@ -1,0 +1,79 @@
+name: NLLB + HESTC ClimateNLP experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      sample_size:
+        description: "Number of silver test terms to translate"
+        required: true
+        default: "20"
+      model:
+        description: "Hugging Face NLLB model"
+        required: true
+        default: "facebook/nllb-200-distilled-600M"
+
+jobs:
+  nllb-experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install experiment dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-experiment.txt
+
+      - name: Reconstruct HESTC master corpus
+        run: python src/merge_corpus_parts.py
+
+      - name: Build 500-term silver benchmark
+        run: |
+          python src/build_climate_benchmark.py \
+            --corpus data/HESTC10K_master.csv \
+            --out build/hestc_climate_silver_terms.csv
+
+      - name: Select held-out test sample
+        env:
+          SAMPLE_SIZE: ${{ inputs.sample_size }}
+        run: |
+          python - <<'PY'
+          import csv, os
+          n = int(os.environ['SAMPLE_SIZE'])
+          src = 'build/hestc_climate_silver_terms.csv'
+          dst = 'build/silver_test_sample.csv'
+          with open(src, encoding='utf-8-sig', newline='') as f:
+              rows = [r for r in csv.DictReader(f) if r['split'] == 'test']
+          rows = rows[:n]
+          if not rows:
+              raise SystemExit('No test rows selected')
+          with open(dst, 'w', encoding='utf-8-sig', newline='') as f:
+              w = csv.DictWriter(f, fieldnames=list(rows[0]))
+              w.writeheader()
+              w.writerows(rows)
+          print('Selected', len(rows), 'held-out silver test terms')
+          PY
+
+      - name: Run NLLB baseline and HESTC-constrained systems
+        run: |
+          python src/run_experiment.py \
+            --benchmark build/silver_test_sample.csv \
+            --corpus data/HESTC10K_master.csv \
+            --model "${{ inputs.model }}" \
+            --out-dir results/nllb_hestc
+
+      - name: Upload experiment results
+        uses: actions/upload-artifact@v4
+        with:
+          name: nllb-hestc-results
+          path: |
+            build/silver_test_sample.csv
+            results/nllb_hestc/
