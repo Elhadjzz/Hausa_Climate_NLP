@@ -41,3 +41,7 @@ Every Hausa entry in the current release remains **Candidate drafted**. Do not d
 ## Formatted workbook
 
 The research workflow also maintains a formatted Excel workbook with dashboards and review sheets. The canonical GitHub data distribution is CSV-based because it is diffable, reproducible and easier to audit programmatically.
+
+## Bilingual schema update
+
+The HESTC corpus now exposes a canonical `Hausa term` column immediately after `English term`, while retaining candidate, preferred, validation, and provenance fields for reproducibility.
