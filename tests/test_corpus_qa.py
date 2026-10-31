@@ -65,6 +65,10 @@ def test_source_links_complete():
     )
 
 
+def test_hausa_terms_complete():
+    assert all(row["Hausa term"].strip() for row in load())
+
+
 def test_hausa_candidates_complete():
     assert all(row["Hausa candidate"].strip() for row in load())
 
