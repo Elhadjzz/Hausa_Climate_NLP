@@ -3,7 +3,6 @@
 SCHEMA = [
     "ID",
     "English term",
-    "Hausa term (Google Translate)",
     "synonym/abbreviation",
     "terminology type",
     "domain",
