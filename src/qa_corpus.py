@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 REQUIRED = [
     "ID",
     "English term",
+    "Hausa term",
     "terminology type",
     "domain",
     "subdomain",
@@ -112,6 +113,7 @@ def main() -> None:
         or bool(report["invalid_source_urls"])
         or report["missing_values_by_column"]["ID"] > 0
         or report["missing_values_by_column"]["English term"] > 0
+        or report["missing_values_by_column"]["Hausa term"] > 0
         or report["missing_values_by_column"]["concise definition"] > 0
         or report["missing_values_by_column"]["source identifier/link"] > 0
     )
