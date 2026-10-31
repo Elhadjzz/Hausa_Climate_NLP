@@ -82,6 +82,7 @@ EXPECTED_COUNTS = {
 SCHEMA = [
     "ID",
     "English term",
+    "Hausa term",
     "synonym/abbreviation",
     "terminology type",
     "domain",
