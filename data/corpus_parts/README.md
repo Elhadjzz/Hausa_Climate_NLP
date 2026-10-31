@@ -30,3 +30,7 @@ The merger verifies all expected part counts, **11,034 total records**, unique I
 See `MANIFEST.csv` for the exact part counts.
 
 > Hausa forms in this release remain **Candidate drafted** until linguistic and environmental-domain expert validation is completed.
+
+## Current bilingual schema
+
+All corpus part files use the canonical structure `ID, English term, Hausa term, ...`. The `Hausa term` field is populated from the preferred Hausa form while candidate, validation, strategy, and provenance fields are retained for auditability.
